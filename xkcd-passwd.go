@@ -13,9 +13,14 @@
 package main
 
 import (
+	"crypto/rand"
+	"encoding/json"
 	"flag"
+	"fmt"
 	"github.com/sirupsen/logrus"
 	"io"
+	"io/ioutil"
+	"math/big"
 	"os"
 	"strings"
 )
@@ -26,6 +31,24 @@ var version string = "undefined"
 var release string = "undefined"
 var shouldDebug bool = false
 var log *logrus.Logger
+
+func random_word(dictionary []string) string {
+	var (
+		len_dictionary int64
+		n *big.Int
+		err error
+	)
+
+	len_dictionary = int64(len(dictionary))
+
+	n, err = rand.Int(rand.Reader, big.NewInt(len_dictionary))
+	if err != nil {
+		log.Fatal("Error during rand.Int: ", err)
+		panic(err)
+	}
+
+	return dictionary[int(n.Int64())]
+}
 
 func main() {
 
@@ -63,7 +86,27 @@ func main() {
 		Level: logrus.DebugLevel,
 	}
 
-	if shouldDebug { logMain.Printf("version = %v\nrelease = %v\n", version, release) }
+	log.Printf("version = %v\nrelease = %v\n", version, release)
+
+	// curl --remote-name --location https://raw.githubusercontent.com/dwyl/english-words/master/words_dictionary.json
+	// sed -i -e 's,: 1,,' -e 's,{,[,' -e 's,},],' words_dictionary.json
+	content, err := ioutil.ReadFile("./words_dictionary.json")
+	if err != nil {
+		log.Fatal("Error when opening file: ", err)
+	}
+ 
+	var dictionary []string
+	err = json.Unmarshal(content, &dictionary)
+	if err != nil {
+		log.Fatal("Error during Unmarshal(): ", err)
+		panic(err)
+	}
+
+	log.Printf("len(dictionary) = %v\n", len(dictionary))
+
+	var word = random_word(dictionary)
+
+	fmt.Printf("%v\n", word)
 
 	os.Exit(0)
 }
