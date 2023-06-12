@@ -432,7 +432,6 @@ func main() {
 		defaultFilename string
 		jsonData []byte
 		defaults Defaults
-		dictionary []string
 		err error
 	)
 
@@ -486,12 +485,7 @@ func main() {
 	}
 	log.Printf("defaults: %+v\n", defaults)
 
-	// Read in the dictionary
-	dictionary, err = read_dictionary()
-	if err != nil {
-		log.Fatal("Error reading dictionary: ", err)
-	}
-	log.Printf("len(dictionary) = %v\n", len(dictionary))
+	log.Printf("len(dictionary1) = %v\n", len(dictionary))
 	defaults.WordDictionary = dictionary
 
 	// Generate the password based on the data in the defaults structure
