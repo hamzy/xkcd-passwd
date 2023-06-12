@@ -28,6 +28,7 @@ import (
 	"math"
 	"math/big"
 	"os"
+	"strconv"
 	"strings"
 	"unicode"
 )
@@ -176,12 +177,12 @@ func read_defaults(jsonData []byte) (Defaults, error) {
 	return defaults, err
 }
 
-func read_dictionary() ([]string, error) {
+func read_dictionary(filename string) ([]string, error) {
 
 	var dictionary []string
 	var err error
 
-	content, err := ioutil.ReadFile("words_dictionary2.json")
+	content, err := ioutil.ReadFile(filename)
 	if err != nil {
 		log.Fatal("Error when opening file: ", err)
 		panic(err)
@@ -428,6 +429,8 @@ func main() {
 			Level: logrus.DebugLevel,
 		}
 		ptrShouldDebug *string
+		num_passwords = 1
+		args []string
 		out io.Writer
 		defaultFilename string
 		jsonData []byte
@@ -438,6 +441,7 @@ func main() {
 	ptrShouldDebug = flag.String("shouldDebug", "false", "Should output debug output")
 
 	flag.Parse()
+	args = flag.Args()
 
 	switch strings.ToLower(*ptrShouldDebug) {
 	case "true":
@@ -459,6 +463,16 @@ func main() {
 		Level: logrus.DebugLevel,
 	}
 
+	log.Printf("flag.Args = %v\n", args)
+	if len(args) == 1 {
+		num_passwords, err = strconv.Atoi(args[0])
+		if err != nil {
+			logMain.Fatal("Error during strconv.Atoi: ", err)
+		}
+	} else if len(args) != 0 {
+		logMain.Fatal(fmt.Sprintf("Error: Only one argument is allowed\n"))
+	}
+
 	log.Printf("version = %v\nrelease = %v\n", version, release)
 
 	// Find the defaults.json file
@@ -474,25 +488,27 @@ func main() {
 	// Read the defaults.json file
 	jsonData, err = ioutil.ReadFile(defaultFilename)
 	if err != nil {
-		log.Fatal("Error when opening defaults.json: ", err)
+		logMain.Fatal("Error when opening defaults.json: ", err)
 		panic(err)
 	}
 
 	// Return the default struct from the file data
 	defaults, err = read_defaults(jsonData)
 	if err != nil {
-		log.Fatal("Error reading defaults: ", err)
+		logMain.Fatal("Error reading defaults: ", err)
 	}
 	log.Printf("defaults: %+v\n", defaults)
 
-	log.Printf("len(dictionary1) = %v\n", len(dictionary))
+	log.Printf("len(dictionary) = %v\n", len(dictionary))
 	defaults.WordDictionary = dictionary
 
-	// Generate the password based on the data in the defaults structure
-	err = generate_output(defaults)
-	if err != nil {
-		log.Fatal("Error generating output: ", err)
-		os.Exit(1)
+	for i := 0; i < num_passwords; i++ {
+		// Generate the password based on the data in the defaults structure
+		err = generate_output(defaults)
+		if err != nil {
+			logMain.Fatal("Error generating output: ", err)
+			os.Exit(1)
+		}
 	}
 
 	os.Exit(0)

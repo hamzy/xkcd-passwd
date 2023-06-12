@@ -15,9 +15,11 @@
 set -euo pipefail
 
 function run_xkcd_passwd() {
-	go run -ldflags="-X main.version=$(git describe --always --long --dirty)" .
+#	go run -ldflags="-X main.version=$(git describe --always --long --dirty)" .
+	./xkcd-passwd
 }
 
+rm --force ./xkcd-passwd
 go vet
 go build -ldflags="-X main.version=$(git describe --always --long --dirty)" .
 
