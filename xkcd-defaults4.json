@@ -1,0 +1,33 @@
+{
+ "num_words": 2,
+ "word_length_min": 5,
+ "word_length_max": 8,
+ "case_transform": "RANDOM",
+ "separator_character": "RANDOM",
+ "separator_alphabet": [
+  "!",
+  "@",
+  "$",
+  "%",
+  "^",
+  "&",
+  "*",
+  "-",
+  "_",
+  "+",
+  "=",
+  ":",
+  "|",
+  "~",
+  "?",
+  "/",
+  ".",
+  ";"
+ ],
+ "padding_digits_before": 4,
+ "padding_digits_after": 1,
+ "padding_type": "ADAPTIVE",
+ "padding_character": "+",
+ "pad_to_length": 64,
+ "random_increment": "AUTO"
+}

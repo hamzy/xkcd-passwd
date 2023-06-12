@@ -10,6 +10,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Based on https://xkpasswd.net/
+
+// go vet && go run -ldflags="-X main.version=$(git describe --always --long --dirty)" . -shouldDebug true
+
 package main
 
 import (
@@ -24,7 +28,6 @@ import (
 	"math"
 	"math/big"
 	"os"
-	"strconv"
 	"strings"
 	"unicode"
 )
@@ -61,6 +64,13 @@ const (
 	PaddingAdaptive
 )
 
+type PaddingCharacter int
+const (
+	PaddingRandom		PaddingCharacter = iota		// Use symbol_alphabet
+	PaddingSeparator					// Use SeparatorRandom result
+	PaddingSpecified					// Use the string value
+)
+
 // https://www.digitalocean.com/community/tutorials/how-to-use-json-in-go
 type JSON_Defaults struct {
 	NumWords		int		`json:"num_words"`
@@ -77,7 +87,6 @@ type JSON_Defaults struct {
 	PaddingCharactersBefore	int		`json:"padding_characters_before"`
 	PaddingCharactersAfter	int		`json:"padding_characters_after"`
 	PadToLength		int		`json:"pad_to_length"`
-	RandomIncrement		string		`json:"random_increment"`
 }
 
 type Defaults struct {
@@ -91,75 +100,19 @@ type Defaults struct {
 	PaddingDigitsBefore	int
 	PaddingDigitsAfter	int
 	PaddingType		PaddingType
-	PaddingCharacter	string
+	PaddingCharacter	PaddingCharacter
 	SymbolAlphabet		[]string
 	PaddingCharactersBefore	int
 	PaddingCharactersAfter	int
 	PadToLength		int
-	RandomIncrement		string
 }
 
-const jsonData1 = `{
- "num_words": 3,
- "word_length_min": 4,
- "word_length_max": 8,
- "case_transform": "CAPITALISE",
- "separator_character": "RANDOM",
- "separator_alphabet": [
-  "!",
-  "@",
-  "$",
-  "%",
-  "^",
-  "&",
-  "*",
-  "-",
-  "_",
-  "+",
-  "=",
-  ":",
-  "|",
-  "~",
-  "?",
-  "/",
-  ".",
-  ";"
- ],
- "padding_digits_before": 3,
- "padding_digits_after": 2,
- "padding_type": "FIXED",
- "padding_character": "RANDOM",
- "symbol_alphabet": [
-  "!",
-  "@",
-  "$",
-  "%",
-  "^",
-  "&",
-  "*",
-  "-",
-  "_",
-  "+",
-  "=",
-  ":",
-  "|",
-  "~",
-  "?",
-  "/",
-  ".",
-  ";"
- ],
- "padding_characters_before": 2,
- "padding_characters_after": 2,
- "random_increment": "AUTO"
-}`
-
-func read_defaults(jsonData string) (Defaults, error) {
+func read_defaults(jsonData []byte) (Defaults, error) {
 
 	var json_defaults JSON_Defaults
 	var defaults Defaults
 	var err error
-	err = json.Unmarshal([]byte(jsonData), &json_defaults)
+	err = json.Unmarshal(jsonData, &json_defaults)
 	if err != nil {
 		return Defaults{}, err
 	}
@@ -203,12 +156,22 @@ func read_defaults(jsonData string) (Defaults, error) {
 	default:
 		return Defaults{}, errors.New(fmt.Sprintf("Error: Unknown PaddingType: %v", json_defaults.PaddingType))
 	}
-	defaults.PaddingCharacter = json_defaults.PaddingCharacter
 	defaults.SymbolAlphabet = json_defaults.SymbolAlphabet
+	json_defaults.PaddingCharacter = strings.ToLower(json_defaults.PaddingCharacter)
+	switch json_defaults.PaddingCharacter {
+	case "random":		defaults.PaddingCharacter = PaddingRandom
+	case "separator":	defaults.PaddingCharacter = PaddingSeparator
+	default:
+		if len(json_defaults.PaddingCharacter) > 1 {
+			return Defaults{}, errors.New(fmt.Sprintf("Error: Unknown PaddingCharacter: %v", json_defaults.PaddingCharacter))
+		}
+		defaults.PaddingCharacter = PaddingSpecified
+		defaults.SymbolAlphabet = make([]string, 1, 1)
+		defaults.SymbolAlphabet[0] = json_defaults.PaddingCharacter
+	}
 	defaults.PaddingCharactersBefore = json_defaults.PaddingCharactersBefore
 	defaults.PaddingCharactersAfter = json_defaults.PaddingCharactersAfter
 	defaults.PadToLength = json_defaults.PadToLength
-	defaults.RandomIncrement = json_defaults.RandomIncrement
 
 	return defaults, err
 }
@@ -218,11 +181,10 @@ func read_dictionary() ([]string, error) {
 	var dictionary []string
 	var err error
 
-	// curl --remote-name --location https://raw.githubusercontent.com/dwyl/english-words/master/words_dictionary.json
-	// sed -i -e 's,: 1,,' -e 's,{,[,' -e 's,},],' words_dictionary.json
-	content, err := ioutil.ReadFile("./words_dictionary.json")
+	content, err := ioutil.ReadFile("words_dictionary2.json")
 	if err != nil {
 		log.Fatal("Error when opening file: ", err)
+		panic(err)
 	}
  
 	err = json.Unmarshal(content, &dictionary)
@@ -232,6 +194,26 @@ func read_dictionary() ([]string, error) {
 	}
 
 	return dictionary, err
+
+}
+
+func random_padding(defaults Defaults) string {
+
+	var (
+		len_dictionary int64
+		n *big.Int
+		err error
+	)
+
+	len_dictionary = int64(len(defaults.SymbolAlphabet))
+
+	n, err = rand.Int(rand.Reader, big.NewInt(len_dictionary))
+	if err != nil {
+		log.Fatal("Error during rand.Int: ", err)
+		panic(err)
+	}
+
+	return defaults.SymbolAlphabet[int(n.Int64())]
 
 }
 
@@ -300,8 +282,12 @@ func random_word(defaults Defaults) string {
 		word = string(chars)
 	case CaseCapitalise:
 		chars := []rune{}
-		for _, r := range word {
-			chars = append(chars, unicode.ToUpper(r))
+		for i, r := range word {
+			if i == 0 {
+				chars = append(chars, unicode.ToUpper(r))
+			} else {
+				chars = append(chars, unicode.ToLower(r))
+			}
 		}
 		word = string(chars)
 	case CaseInvert:
@@ -341,7 +327,7 @@ func random_word(defaults Defaults) string {
 	return word
 }
 
-func random_digit(num_digits int) string {
+func random_digits(num_digits int) string {
 
 	var (
 		m int64
@@ -357,43 +343,78 @@ func random_digit(num_digits int) string {
 		panic(err)
 	}
 
-	return strconv.Itoa(int(n.Int64()))
+	return fmt.Sprintf("%0*d", num_digits, n.Int64())
 
 }
 
 func generate_output(defaults Defaults) (error) {
 
 	var (
-//		padding string
+		builder strings.Builder
+		result string
 		separator string
+		padding string
 		err error
 	)
 
-//	padding = random_padding(defaults)
 	separator = random_separator(defaults)
 
-//	for i := 0; i < defaults.PaddingCharactersBefore; i++ {
-//		fmt.Printf("%v", padding)
-//	}
+	if defaults.PaddingType == PaddingFixed || defaults.PaddingType == PaddingAdaptive {
+		if defaults.PaddingCharacter == PaddingRandom {
+			padding = random_padding(defaults)
+		} else if defaults.PaddingCharacter == PaddingSeparator {
+			padding = separator
+		} else if defaults.PaddingCharacter == PaddingSpecified {
+			padding = defaults.SymbolAlphabet[0]
+		}
+	}
+
+	if defaults.PaddingType == PaddingFixed {
+		for i := 0; i < defaults.PaddingCharactersBefore; i++ {
+			fmt.Fprintf(&builder, "%v", padding)
+		}
+	}
 
 	if defaults.PaddingDigitsBefore > 0 {
-		fmt.Printf("%v", random_digit(defaults.PaddingDigitsBefore))
-		fmt.Printf("%v", separator)
+		fmt.Fprintf(&builder, "%v", random_digits(defaults.PaddingDigitsBefore))
+		fmt.Fprintf(&builder, "%v", separator)
 	}
 
 	for i := 0; i < defaults.NumWords; i++ {
-		fmt.Printf("%v", random_word(defaults))
+		fmt.Fprintf(&builder, "%v", random_word(defaults))
 		if i < defaults.NumWords - 1 {
-			fmt.Printf("%v", separator)
+			fmt.Fprintf(&builder, "%v", separator)
 		}
 	}
 
 	if defaults.PaddingDigitsAfter > 0 {
-		fmt.Printf("%v", separator)
-		fmt.Printf("%v", random_digit(defaults.PaddingDigitsAfter))
+		fmt.Fprintf(&builder, "%v", separator)
+		fmt.Fprintf(&builder, "%v", random_digits(defaults.PaddingDigitsAfter))
 	}
 
-	fmt.Printf("\n")
+	if defaults.PaddingType == PaddingFixed {
+		for i := 0; i < defaults.PaddingCharactersAfter; i++ {
+			fmt.Fprintf(&builder, "%v", padding)
+		}
+	}
+
+	result = builder.String()
+	log.Printf("len builder = %v", len(result))
+
+	if defaults.PaddingType == PaddingAdaptive {
+		log.Printf("PadToLength = %v", defaults.PadToLength)
+		if len(result) > defaults.PadToLength {
+			result = result[1:defaults.PadToLength+1]
+		} else if len(result) < defaults.PadToLength {
+			var length = defaults.PadToLength - len(result)
+			for i := 0; i < length; i++ {
+				fmt.Fprintf(&builder, "%v", padding)
+			}
+			result = builder.String()
+		}
+	}
+
+	fmt.Printf("%v\n", result)
 
 	return err
 }
@@ -408,6 +429,8 @@ func main() {
 		}
 		ptrShouldDebug *string
 		out io.Writer
+		defaultFilename string
+		jsonData []byte
 		defaults Defaults
 		dictionary []string
 		err error
@@ -439,11 +462,31 @@ func main() {
 
 	log.Printf("version = %v\nrelease = %v\n", version, release)
 
-	defaults, err = read_defaults(jsonData1)
+	// Find the defaults.json file
+	for _, filename := range([]string{ "~/defaults.json", "defaults.json" }) {
+		log.Printf("%v\n", filename)
+		_, err := os.Stat(filename)
+		log.Printf("%v\n", err)
+		if err == nil {
+			defaultFilename = filename
+		}
+	}
+
+	// Read the defaults.json file
+	jsonData, err = ioutil.ReadFile(defaultFilename)
+	if err != nil {
+		log.Fatal("Error when opening defaults.json: ", err)
+		panic(err)
+	}
+
+	// Return the default struct from the file data
+	defaults, err = read_defaults(jsonData)
 	if err != nil {
 		log.Fatal("Error reading defaults: ", err)
 	}
+	log.Printf("defaults: %+v\n", defaults)
 
+	// Read in the dictionary
 	dictionary, err = read_dictionary()
 	if err != nil {
 		log.Fatal("Error reading dictionary: ", err)
@@ -451,9 +494,11 @@ func main() {
 	log.Printf("len(dictionary) = %v\n", len(dictionary))
 	defaults.WordDictionary = dictionary
 
+	// Generate the password based on the data in the defaults structure
 	err = generate_output(defaults)
 	if err != nil {
 		log.Fatal("Error generating output: ", err)
+		os.Exit(1)
 	}
 
 	os.Exit(0)
