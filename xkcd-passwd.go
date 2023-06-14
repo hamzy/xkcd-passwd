@@ -44,7 +44,7 @@ type CaseType int
 const (
 	CaseNone	CaseType = iota		// case - all lowercase
 	CaseAlternate				// CaSe - first character is upper case, second is lowercase, repeat
-	CaseCapitalise				// CASE - first character is uppercase, rest are lowercase
+	CaseCapitalise				// Case - first character is uppercase, rest are lowercase
 	CaseInvert				// cASE - first character is lowercase, rest are uppercase
 	CaseUpper				// CASE - all uppercase
 	CaseRandom				// cASe - every character is randomly upper or lower
