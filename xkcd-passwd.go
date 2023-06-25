@@ -12,7 +12,7 @@
 
 // Based on https://xkpasswd.net/
 
-// go vet && go run -ldflags="-X main.version=$(git describe --always --long --dirty)" . -shouldDebug true
+// go vet && go build -ldflags="-X main.version=$(git describe --always --long --dirty) -X main.release=$(git tag --sort=-version:refname | head -n1)" .
 
 package main
 
@@ -34,7 +34,7 @@ import (
 )
 
 // Replaced with:
-//   -ldflags="-X main.version=$(git describe --always --long --dirty)"
+//   -ldflags="-X main.version=$(git describe --always --long --dirty) -X main.release=$(git tag --sort=-version:refname | head -n1)"
 var version string = "undefined"
 var release string = "undefined"
 var shouldDebug bool = false
@@ -428,6 +428,7 @@ func main() {
 			Formatter: new(logrus.TextFormatter),
 			Level: logrus.DebugLevel,
 		}
+		ptrShouldVerson *bool
 		ptrShouldDebug *string
 		num_passwords = 1
 		args []string
@@ -438,10 +439,17 @@ func main() {
 		err error
 	)
 
+	ptrShouldVerson = flag.Bool("version", false, "Should output program version")
 	ptrShouldDebug = flag.String("shouldDebug", "false", "Should output debug output")
 
 	flag.Parse()
 	args = flag.Args()
+
+	if *ptrShouldVerson {
+		fmt.Println("version =", version)
+		fmt.Println("release =", release)
+		os.Exit(0)
+	}
 
 	switch strings.ToLower(*ptrShouldDebug) {
 	case "true":
