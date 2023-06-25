@@ -475,8 +475,8 @@ func main() {
 
 	log.Printf("version = %v\nrelease = %v\n", version, release)
 
-	// Find the defaults.json file
-	for _, filename := range([]string{ "~/defaults.json", "defaults.json" }) {
+	// Find the .xkcd-defaults.json file
+	for _, filename := range([]string{ "~/.xkcd-defaults.json", ".xkcd-defaults.json" }) {
 		log.Printf("%v\n", filename)
 		_, err := os.Stat(filename)
 		log.Printf("%v\n", err)
@@ -485,10 +485,10 @@ func main() {
 		}
 	}
 
-	// Read the defaults.json file
+	// Read the .xkcd-defaults.json file
 	jsonData, err = ioutil.ReadFile(defaultFilename)
 	if err != nil {
-		logMain.Fatal("Error when opening defaults.json: ", err)
+		logMain.Fatal("Error when opening .xkcd-defaults.json: ", err)
 		panic(err)
 	}
 
