@@ -28,6 +28,7 @@ import (
 	"math"
 	"math/big"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"unicode"
@@ -433,6 +434,8 @@ func main() {
 		num_passwords = 1
 		args []string
 		out io.Writer
+		homeDir string
+		filename string
 		defaultFilename string
 		jsonData []byte
 		defaults Defaults
@@ -483,11 +486,25 @@ func main() {
 
 	log.Printf("version = %v\nrelease = %v\n", version, release)
 
-	// Find the .xkcd-defaults.json file
-	for _, filename := range([]string{ "~/.xkcd-defaults.json", ".xkcd-defaults.json" }) {
-		log.Printf("%v\n", filename)
-		_, err := os.Stat(filename)
-		log.Printf("%v\n", err)
+	// Find home
+	homeDir, err = os.UserHomeDir()
+	if err != nil {
+		logMain.Fatal("Error when callin os.UserHomeDir: ", err)
+		panic(err)
+	}
+	log.Printf("homeDir = %v", homeDir)
+
+	// Does our default file live at home?
+	filename = filepath.Join(homeDir, ".xkcd-defaults.json")
+	_, err = os.Stat(filename)
+	log.Printf("os.Stat(\"%v\") = %v\n", filename, err)
+	if err == nil {
+		defaultFilename = filename
+	} else {
+		// Or does it live in the current directory?
+		filename = ".xkcd-defaults.json"
+		_, err = os.Stat(filename)
+		log.Printf("os.Stat(\"%v\") = %v\n", filename, err)
 		if err == nil {
 			defaultFilename = filename
 		}
