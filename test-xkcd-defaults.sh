@@ -21,13 +21,15 @@ function run_xkcd_passwd() {
 
 rm --force ./xkcd-passwd
 go vet
-go build -ldflags="-X main.version=$(git describe --always --long --dirty)" .
+go build -ldflags="-X main.version=$(git describe --always --long --dirty) -X main.release=$(git tag --sort=-version:refname | head -n1)" .
 
 (
 	while read FILENAME
 	do
 		echo ${FILENAME}
-		cp --force ${FILENAME} defaults.json
+		cp --force ${FILENAME} .xkcd-defaults.json
 		run_xkcd_passwd
 	done
 ) < <(find . -iname 'xkcd-defaults*.json')
+
+rm .xkcd-defaults.json
